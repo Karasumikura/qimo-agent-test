@@ -1,0 +1,104 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  width: 420px;
+  margin: 0;
+  padding: 14px;
+  font-family: "Microsoft YaHei", "Segoe UI", sans-serif;
+  color: #17202a;
+  background: #f6f7f9;
+}
+
+header {
+  margin-bottom: 12px;
+}
+
+h1 {
+  margin: 0;
+  font-size: 18px;
+}
+
+p {
+  margin: 5px 0 0;
+  color: #667085;
+  font-size: 12px;
+}
+
+label {
+  display: grid;
+  gap: 5px;
+  margin-bottom: 10px;
+  color: #667085;
+  font-size: 12px;
+}
+
+input {
+  width: 100%;
+  border: 1px solid #d9dee7;
+  border-radius: 8px;
+  padding: 8px 9px;
+  background: white;
+  color: #17202a;
+}
+
+button {
+  min-height: 34px;
+  border: 1px solid #d9dee7;
+  border-radius: 8px;
+  background: white;
+  color: #17202a;
+  cursor: pointer;
+  padding: 0 10px;
+}
+
+button:hover {
+  border-color: #0f766e;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  margin: 10px 0;
+}
+
+#importAllBtn {
+  background: #0f766e;
+  border-color: #0f766e;
+  color: white;
+  flex: 1;
+}
+
+.candidate-list {
+  display: grid;
+  gap: 8px;
+  max-height: 300px;
+  overflow: auto;
+}
+
+.candidate {
+  border: 1px solid #d9dee7;
+  border-radius: 8px;
+  padding: 9px;
+  background: white;
+}
+
+.candidate-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+  color: #667085;
+}
+
+.url {
+  margin-top: 5px;
+  color: #17202a;
+  font-size: 12px;
+  word-break: break-all;
+}
+
+.hint {
+  line-height: 1.45;
+}

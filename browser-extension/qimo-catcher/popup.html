@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>Qimo Catcher</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <header>
+      <h1>Qimo Catcher</h1>
+      <p id="status">读取当前标签页</p>
+    </header>
+
+    <label>
+      <span>课程</span>
+      <input id="courseInput" value="未命名课程" />
+    </label>
+
+    <label>
+      <span>标题</span>
+      <input id="titleInput" />
+    </label>
+
+    <div class="actions">
+      <button id="refreshBtn" type="button">刷新</button>
+      <button id="clearBtn" type="button">清空</button>
+    </div>
+
+    <div id="candidateList" class="candidate-list"></div>
+
+    <div class="actions">
+      <button id="importAllBtn" type="button">导入全部候选</button>
+      <button id="copyBtn" type="button">复制候选</button>
+    </div>
+
+    <p class="hint">先在课程页播放视频，再打开这里。若本地服务未启动，请先打开 http://127.0.0.1:8000。</p>
+
+    <script src="popup.js"></script>
+  </body>
+</html>

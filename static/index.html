@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>期末重点智能体</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <header class="app-header">
+      <div>
+        <h1>期末重点智能体</h1>
+        <p id="systemLine">初始化中</p>
+      </div>
+      <div class="header-actions">
+        <a id="jluLink" class="ghost-link" href="https://ilearntec.jlu.edu.cn/courselibrary-web/index" target="_blank" rel="noreferrer">学在吉大课程库</a>
+        <button id="refreshBtn" type="button">刷新</button>
+      </div>
+    </header>
+
+    <main class="shell">
+      <section class="tool-band">
+        <form id="uploadForm" class="control-group">
+          <label>
+            <span>课程</span>
+            <input id="courseInput" name="course" value="未命名课程" autocomplete="off" />
+          </label>
+          <label>
+            <span>类型</span>
+            <select id="kindInput" name="kind">
+              <option value="lecture_video">课堂视频</option>
+              <option value="lecture_audio">课堂音频</option>
+              <option value="transcript">课堂文字稿</option>
+              <option value="past_exam">往年题</option>
+              <option value="notes">课件/笔记</option>
+            </select>
+          </label>
+          <label class="file-picker">
+            <span>文件</span>
+            <input id="fileInput" name="file" type="file" />
+          </label>
+          <button type="submit">上传</button>
+        </form>
+
+        <form id="remoteForm" class="control-group remote-group">
+          <label>
+            <span>视频标题</span>
+            <input id="remoteTitle" value="学在吉大视频" autocomplete="off" />
+          </label>
+          <label>
+            <span>视频地址</span>
+            <input id="remoteUrl" placeholder="粘贴 mp4 或 m3u8 地址" autocomplete="off" />
+          </label>
+          <label>
+            <span>来源页面</span>
+            <input id="remotePageUrl" placeholder="可选：视频页 URL" autocomplete="off" />
+          </label>
+          <button type="submit">导入视频</button>
+        </form>
+
+        <section class="bookmark-panel">
+          <div>
+            <h2>浏览器导入</h2>
+            <p>抓取 mp4 请优先安装 Qimo Catcher 扩展；书签只适合页面能暴露地址或文字稿的情况。</p>
+          </div>
+          <div class="bookmark-actions">
+            <button id="copyBookmarkletBtn" type="button">复制书签脚本</button>
+            <button id="copyExtensionPathBtn" type="button">复制扩展目录</button>
+          </div>
+        </section>
+
+        <section class="llm-panel">
+          <div class="llm-head">
+            <label class="check-row">
+              <input id="llmEnabled" type="checkbox" />
+              <span>启用 LLM 语义分析</span>
+            </label>
+            <span id="llmStatus">本地规则分析</span>
+          </div>
+          <div class="llm-grid">
+            <label>
+              <span>baseURL</span>
+              <input id="llmBaseUrl" placeholder="https://api.openai.com/v1" autocomplete="off" />
+            </label>
+            <label>
+              <span>APIKEY</span>
+              <input id="llmApiKey" type="password" placeholder="sk-..." autocomplete="off" />
+            </label>
+            <label>
+              <span>模型</span>
+              <input id="llmModel" placeholder="gpt-4o-mini / deepseek-chat" autocomplete="off" />
+            </label>
+            <label>
+              <span>温度</span>
+              <input id="llmTemperature" type="number" min="0" max="1" step="0.1" value="0.2" />
+            </label>
+          </div>
+        </section>
+
+        <form id="textForm" class="control-group paste-group">
+          <label>
+            <span>标题</span>
+            <input id="textTitle" value="课堂文字稿.txt" autocomplete="off" />
+          </label>
+          <label>
+            <span>文本类型</span>
+            <select id="textKind">
+              <option value="transcript">课堂文字稿</option>
+              <option value="past_exam">往年题</option>
+              <option value="notes">课件/笔记</option>
+            </select>
+          </label>
+          <textarea id="textInput" rows="5" placeholder="粘贴文字稿、字幕、往年题文本"></textarea>
+          <button type="submit">保存文本</button>
+        </form>
+      </section>
+
+      <section class="workspace">
+        <div class="pane materials-pane">
+          <div class="pane-head">
+            <div>
+              <h2>资料</h2>
+              <p id="materialCount">0 份</p>
+            </div>
+            <button id="analyzeBtn" type="button">生成报告</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>文件</th>
+                  <th>类型</th>
+                  <th>状态</th>
+                  <th>备注</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="materialsBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="pane report-pane">
+          <div class="pane-head">
+            <div>
+              <h2>报告</h2>
+              <p id="reportMeta">尚未生成</p>
+            </div>
+            <a id="downloadReport" class="ghost-link disabled" href="#" target="_blank" rel="noreferrer">Markdown</a>
+          </div>
+
+          <div id="warnings" class="warnings" hidden></div>
+          <div id="topicList" class="topic-list empty-state">暂无分析结果</div>
+          <pre id="reportPreview" class="report-preview"></pre>
+        </div>
+      </section>
+    </main>
+
+    <div id="toast" class="toast" hidden></div>
+    <script src="/static/app.js" defer></script>
+  </body>
+</html>

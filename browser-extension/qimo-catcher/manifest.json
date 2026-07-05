@@ -1,0 +1,15 @@
+{
+  "manifest_version": 3,
+  "name": "Qimo Catcher",
+  "version": "0.1.0",
+  "description": "Capture authorized course media requests and import them into the local Qimo review agent.",
+  "permissions": ["activeTab", "scripting", "storage", "tabs", "webRequest"],
+  "host_permissions": ["<all_urls>", "http://127.0.0.1:8000/*"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Qimo Catcher"
+  }
+}
