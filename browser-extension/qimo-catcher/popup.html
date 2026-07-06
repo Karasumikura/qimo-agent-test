@@ -7,34 +7,51 @@
   </head>
   <body>
     <header>
-      <h1>Qimo Catcher</h1>
-      <p id="status">Loading current tab...</p>
+      <div>
+        <h1>Qimo Catcher</h1>
+        <p id="status">Checking automatic capture...</p>
+      </div>
+      <label class="switch" title="Pause or resume automatic import">
+        <input id="autoToggle" type="checkbox" checked />
+        <span>Auto</span>
+      </label>
     </header>
 
-    <label>
-      <span>Course</span>
-      <input id="courseInput" value="Unnamed Course" />
-    </label>
+    <section class="panel">
+      <div class="metric">
+        <span>Service</span>
+        <strong id="serviceMetric">-</strong>
+      </div>
+      <div class="metric">
+        <span>Captured</span>
+        <strong id="capturedMetric">0</strong>
+      </div>
+      <div class="metric">
+        <span>Uploaded</span>
+        <strong id="uploadedMetric">0</strong>
+      </div>
+      <div class="metric">
+        <span>Submitted</span>
+        <strong id="submittedMetric">0</strong>
+      </div>
+    </section>
 
-    <label>
-      <span>Title</span>
-      <input id="titleInput" />
-    </label>
+    <section class="page">
+      <span>Current page</span>
+      <strong id="pageTitle">No active page</strong>
+      <p id="pageUrl"></p>
+    </section>
 
     <div class="actions">
-      <button id="refreshBtn" type="button">Refresh</button>
-      <button id="clearBtn" type="button">Clear</button>
+      <button id="openDashboardBtn" type="button">Open dashboard</button>
+      <button id="importNowBtn" type="button">Import now</button>
+      <button id="clearBtn" type="button">Clear history</button>
     </div>
 
-    <div id="candidateList" class="candidate-list"></div>
-
-    <div class="actions">
-      <button id="uploadFirstBtn" type="button">Upload first in browser</button>
-      <button id="importAllBtn" type="button">Import URLs</button>
-      <button id="copyBtn" type="button">Copy</button>
-    </div>
-
-    <p class="hint">Play the course video for a few seconds, then open this popup. Use browser upload first; it uses your logged-in browser session.</p>
+    <p class="hint">
+      Log in to JLU Learning normally, open a course video, and play it for a few seconds.
+      The extension sends authorized media requests and page transcripts to 127.0.0.1 only.
+    </p>
 
     <script src="popup.js"></script>
   </body>

@@ -40,6 +40,19 @@ from .transcription import extract_audio, has_ffmpeg, transcribe_audio, whisper_
 
 STATIC_DIR = ROOT_DIR / "static"
 DEFAULT_COURSE = "未命名课程"
+EXTENSION_STATE: dict[str, Any] = {
+    "connected": False,
+    "auto_enabled": True,
+    "state": "idle",
+    "page_title": "",
+    "page_url": "",
+    "captured_count": 0,
+    "submitted_count": 0,
+    "uploaded_count": 0,
+    "transcript_count": 0,
+    "last_error": "",
+    "last_seen": None,
+}
 
 app = FastAPI(title="Qimo Review Agent", version="0.1.0")
 app.add_middleware(
@@ -89,6 +102,18 @@ class RemoteImportPayload(BaseModel):
     llm: LlmSettings | None = None
 
 
+class ExtensionHeartbeatPayload(BaseModel):
+    auto_enabled: bool = True
+    state: str = "idle"
+    page_title: str = ""
+    page_url: str = ""
+    captured_count: int = 0
+    submitted_count: int = 0
+    uploaded_count: int = 0
+    transcript_count: int = 0
+    last_error: str = ""
+
+
 @app.middleware("http")
 async def add_private_network_cors_header(request: Request, call_next):
     response = await call_next(request)
@@ -118,8 +143,49 @@ def system_status() -> dict[str, Any]:
     return {
         "ffmpeg": has_ffmpeg(),
         "whisper_installed": whisper_available(),
+        "extension": current_extension_state(),
+        "extension_path": str(ROOT_DIR / "browser-extension" / "qimo-catcher"),
         "public_entrypoints": [resource.__dict__ for resource in connector.list_public_entrypoints()],
     }
+
+
+@app.get("/api/agent/status")
+def agent_status(course: str = "") -> dict[str, Any]:
+    materials = list_materials(course or None)
+    running_statuses = {"downloading", "processing"}
+    ready_count = sum(1 for item in materials if item["status"] == "ready")
+    running_count = sum(1 for item in materials if item["status"] in running_statuses)
+    attention_count = sum(1 for item in materials if item["status"] in {"needs_text", "needs_transcript", "error"})
+    latest = latest_analysis(course or None)
+    return {
+        "service": {
+            "ok": True,
+            "ffmpeg": has_ffmpeg(),
+            "whisper_installed": whisper_available(),
+            "extension_path": str(ROOT_DIR / "browser-extension" / "qimo-catcher"),
+        },
+        "extension": current_extension_state(),
+        "materials": {
+            "total": len(materials),
+            "ready": ready_count,
+            "running": running_count,
+            "needs_attention": attention_count,
+            "latest": materials[0] if materials else None,
+        },
+        "latest_analysis": latest,
+    }
+
+
+@app.post("/api/extension/heartbeat")
+def extension_heartbeat(payload: ExtensionHeartbeatPayload) -> dict[str, Any]:
+    EXTENSION_STATE.update(payload.model_dump())
+    EXTENSION_STATE["connected"] = True
+    EXTENSION_STATE["last_seen"] = now_iso()
+    return current_extension_state()
+
+
+def current_extension_state() -> dict[str, Any]:
+    return dict(EXTENSION_STATE)
 
 
 @app.get("/api/materials")
@@ -129,21 +195,24 @@ def materials(course: str = "") -> list[dict[str, Any]]:
 
 @app.post("/api/materials")
 async def upload_material(
+    background_tasks: BackgroundTasks,
     course: str = Form(""),
     kind: str = Form("lecture_video"),
+    auto_analyze: bool = Form(False),
     file: UploadFile = File(...),
 ) -> dict[str, Any]:
     init_storage()
     material_id = uuid.uuid4().hex
+    course_name = course.strip() or DEFAULT_COURSE
     original_name = safe_filename(file.filename or "upload")
     stored_path = UPLOAD_DIR / f"{material_id}_{original_name}"
     with stored_path.open("wb") as target:
         shutil.copyfileobj(file.file, target)
 
-    create_material(
+    material = create_material(
         {
             "id": material_id,
-            "course": course.strip() or DEFAULT_COURSE,
+            "course": course_name,
             "kind": kind,
             "original_name": original_name,
             "stored_path": str(stored_path),
@@ -154,7 +223,21 @@ async def upload_material(
             "notes": "本地文件已上传，正在处理。",
         }
     )
-    return process_stored_material(material_id, stored_path, kind)
+    background_tasks.add_task(process_uploaded_material, material_id, stored_path, kind, course_name, auto_analyze)
+    return material
+
+
+def process_uploaded_material(
+    material_id: str,
+    stored_path: Path,
+    kind: str,
+    course: str,
+    auto_analyze: bool = False,
+) -> None:
+    processed = process_stored_material(material_id, stored_path, kind)
+    if auto_analyze and processed.get("status") == "ready":
+        with suppress(Exception):
+            generate_analysis(course)
 
 
 @app.post("/api/materials/text")
@@ -215,7 +298,13 @@ def queue_remote_import(payload: RemoteImportPayload, background_tasks: Backgrou
 
     material_id = uuid.uuid4().hex
     title = payload.title.strip() or "学在吉大视频"
-    planned_path = plan_import_path(UPLOAD_DIR, material_id, title, candidates[0] if candidates else f"{title}.txt")
+    if candidates:
+        planned_path = plan_import_path(UPLOAD_DIR, material_id, title, candidates[0])
+    else:
+        transcript_title = safe_filename(payload.transcript_title or title or "page-transcript")
+        if "." not in transcript_title:
+            transcript_title += ".txt"
+        planned_path = UPLOAD_DIR / f"{material_id}_{transcript_title}"
     material = create_material(
         {
             "id": material_id,
@@ -244,17 +333,22 @@ def run_remote_import(material_id: str, payload: RemoteImportPayload, target_pat
     transcript_text = payload.transcript_text.strip()
     try:
         if transcript_text:
-            save_transcript_sidecar(material_id, payload, transcript_text)
+            sidecar = save_transcript_sidecar(material_id, payload, transcript_text)
             notes.append(f"已导入页面文字稿 {len(transcript_text)} 字。")
 
         if not candidates:
             update_material(
                 material_id,
+                original_name=sidecar.name if transcript_text else target_path.name,
+                stored_path=str(sidecar if transcript_text else target_path),
                 status="ready",
                 transcript=transcript_text,
                 extracted_text=transcript_text,
                 notes="\n".join(notes + ["未检测到视频地址，仅导入文字稿。"]),
             )
+            if payload.auto_analyze:
+                with suppress(Exception):
+                    generate_analysis(payload.course.strip() or DEFAULT_COURSE, llm_settings=payload.llm)
             return
 
         for candidate in candidates:

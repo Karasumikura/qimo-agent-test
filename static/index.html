@@ -10,128 +10,89 @@
     <header class="app-header">
       <div>
         <h1>期末重点智能体</h1>
-        <p id="systemLine">初始化中</p>
+        <p id="systemLine">正在连接本地服务</p>
       </div>
       <div class="header-actions">
-        <a id="jluLink" class="ghost-link" href="https://ilearntec.jlu.edu.cn/courselibrary-web/index" target="_blank" rel="noreferrer">学在吉大课程库</a>
+        <a class="primary-link" href="https://ilearntec.jlu.edu.cn/courselibrary-web/index" target="_blank" rel="noreferrer">打开学在吉大</a>
         <button id="refreshBtn" type="button">刷新</button>
       </div>
     </header>
 
     <main class="shell">
-      <section class="tool-band">
-        <form id="uploadForm" class="control-group">
-          <label>
-            <span>课程</span>
-            <input id="courseInput" name="course" value="未命名课程" autocomplete="off" />
-          </label>
-          <label>
-            <span>类型</span>
-            <select id="kindInput" name="kind">
-              <option value="lecture_video">课堂视频</option>
-              <option value="lecture_audio">课堂音频</option>
-              <option value="transcript">课堂文字稿</option>
-              <option value="past_exam">往年题</option>
-              <option value="notes">课件/笔记</option>
-            </select>
-          </label>
-          <label class="file-picker">
-            <span>文件</span>
-            <input id="fileInput" name="file" type="file" />
-          </label>
-          <button type="submit">上传</button>
-        </form>
+      <section class="autopilot">
+        <div class="autopilot-copy">
+          <span class="eyebrow">自动模式</span>
+          <h2>登录学在吉大后，后面的收集和分析交给后台。</h2>
+          <p>先启动本地服务并安装浏览器扩展。之后你只需要在浏览器里正常登录学在吉大、打开课程视频并播放几秒，系统会自动抓取可访问的视频、页面已有文字稿和字幕线索。</p>
+        </div>
+        <div class="status-grid">
+          <article class="status-tile" id="serviceTile">
+            <span>本地服务</span>
+            <strong id="serviceState">运行中</strong>
+            <p id="serviceDetail">检查 ffmpeg / Whisper</p>
+          </article>
+          <article class="status-tile" id="extensionTile">
+            <span>浏览器扩展</span>
+            <strong id="extensionState">等待连接</strong>
+            <p id="extensionDetail">安装后会自动回传状态</p>
+          </article>
+          <article class="status-tile" id="captureTile">
+            <span>自动收集</span>
+            <strong id="captureState">待播放视频</strong>
+            <p id="captureDetail">打开课程视频后自动开始</p>
+          </article>
+        </div>
+      </section>
 
-        <form id="remoteForm" class="control-group remote-group">
-          <label>
-            <span>视频标题</span>
-            <input id="remoteTitle" value="学在吉大视频" autocomplete="off" />
-          </label>
-          <label>
-            <span>视频地址</span>
-            <input id="remoteUrl" placeholder="粘贴 mp4 或 m3u8 地址" autocomplete="off" />
-          </label>
-          <label>
-            <span>来源页面</span>
-            <input id="remotePageUrl" placeholder="可选：视频页 URL" autocomplete="off" />
-          </label>
-          <button type="submit">导入视频</button>
-        </form>
-
-        <section class="bookmark-panel">
+      <section class="quick-start">
+        <div class="step done">
+          <span>1</span>
           <div>
-            <h2>浏览器导入</h2>
-            <p>抓取 mp4 请优先安装 Qimo Catcher 扩展；书签只适合页面能暴露地址或文字稿的情况。</p>
+            <strong>本地服务已打开</strong>
+            <p>这个页面能访问，就说明后端已经在运行。</p>
           </div>
-          <div class="bookmark-actions">
-            <button id="copyBookmarkletBtn" type="button">复制书签脚本</button>
+        </div>
+        <div class="step">
+          <span>2</span>
+          <div>
+            <strong>安装 Qimo Catcher 扩展</strong>
+            <p>在 Chrome 扩展页开启开发者模式，加载本项目扩展目录。</p>
             <button id="copyExtensionPathBtn" type="button">复制扩展目录</button>
           </div>
-        </section>
-
-        <section class="llm-panel">
-          <div class="llm-head">
-            <label class="check-row">
-              <input id="llmEnabled" type="checkbox" />
-              <span>启用 LLM 语义分析</span>
-            </label>
-            <span id="llmStatus">本地规则分析</span>
+        </div>
+        <div class="step">
+          <span>3</span>
+          <div>
+            <strong>登录并播放课程视频</strong>
+            <p>登录态由浏览器自己保存。本系统不读取账号、密码或 Cookie。</p>
           </div>
-          <div class="llm-grid">
-            <label>
-              <span>baseURL</span>
-              <input id="llmBaseUrl" placeholder="https://api.openai.com/v1" autocomplete="off" />
-            </label>
-            <label>
-              <span>APIKEY</span>
-              <input id="llmApiKey" type="password" placeholder="sk-..." autocomplete="off" />
-            </label>
-            <label>
-              <span>模型</span>
-              <input id="llmModel" placeholder="gpt-4o-mini / deepseek-chat" autocomplete="off" />
-            </label>
-            <label>
-              <span>温度</span>
-              <input id="llmTemperature" type="number" min="0" max="1" step="0.1" value="0.2" />
-            </label>
-          </div>
-        </section>
-
-        <form id="textForm" class="control-group paste-group">
-          <label>
-            <span>标题</span>
-            <input id="textTitle" value="课堂文字稿.txt" autocomplete="off" />
-          </label>
-          <label>
-            <span>文本类型</span>
-            <select id="textKind">
-              <option value="transcript">课堂文字稿</option>
-              <option value="past_exam">往年题</option>
-              <option value="notes">课件/笔记</option>
-            </select>
-          </label>
-          <textarea id="textInput" rows="5" placeholder="粘贴文字稿、字幕、往年题文本"></textarea>
-          <button type="submit">保存文本</button>
-        </form>
+        </div>
       </section>
 
       <section class="workspace">
         <div class="pane materials-pane">
           <div class="pane-head">
             <div>
-              <h2>资料</h2>
+              <h2>自动收集到的资料</h2>
               <p id="materialCount">0 份</p>
             </div>
-            <button id="analyzeBtn" type="button">生成报告</button>
+            <div class="pane-actions">
+              <label class="course-filter">
+                <span>课程</span>
+                <input id="courseInput" name="course" value="" placeholder="留空显示全部" autocomplete="off" />
+              </label>
+              <button id="analyzeBtn" type="button">生成报告</button>
+            </div>
           </div>
+          <div class="activity-line" id="activityLine">等待扩展自动送入课程资料。</div>
           <div class="table-wrap">
             <table>
               <thead>
                 <tr>
-                  <th>文件</th>
+                  <th>资料</th>
                   <th>类型</th>
                   <th>状态</th>
-                  <th>备注</th>
+                  <th>说明</th>
                   <th></th>
                 </tr>
               </thead>
@@ -143,17 +104,101 @@
         <div class="pane report-pane">
           <div class="pane-head">
             <div>
-              <h2>报告</h2>
+              <h2>期末重点报告</h2>
               <p id="reportMeta">尚未生成</p>
             </div>
             <a id="downloadReport" class="ghost-link disabled" href="#" target="_blank" rel="noreferrer">Markdown</a>
           </div>
 
           <div id="warnings" class="warnings" hidden></div>
-          <div id="topicList" class="topic-list empty-state">暂无分析结果</div>
+          <div id="topicList" class="topic-list empty-state">资料处理完成后会在这里显示重点、考题暗示和复习优先级。</div>
           <pre id="reportPreview" class="report-preview"></pre>
         </div>
       </section>
+
+      <details class="advanced">
+        <summary>高级：往年题、LLM 和手动兜底导入</summary>
+        <section class="advanced-grid">
+          <section class="llm-panel">
+            <div class="llm-head">
+              <label class="check-row">
+                <input id="llmEnabled" type="checkbox" />
+                <span>启用 LLM 语义分析</span>
+              </label>
+              <span id="llmStatus">本地规则分析</span>
+            </div>
+            <div class="llm-grid">
+              <label>
+                <span>baseURL</span>
+                <input id="llmBaseUrl" placeholder="https://api.openai.com/v1" autocomplete="off" />
+              </label>
+              <label>
+                <span>APIKEY</span>
+                <input id="llmApiKey" type="password" placeholder="sk-..." autocomplete="off" />
+              </label>
+              <label>
+                <span>模型</span>
+                <input id="llmModel" placeholder="gpt-4o-mini / deepseek-chat" autocomplete="off" />
+              </label>
+              <label>
+                <span>温度</span>
+                <input id="llmTemperature" type="number" min="0" max="1" step="0.1" value="0.2" />
+              </label>
+            </div>
+          </section>
+
+          <form id="textForm" class="control-group paste-group">
+            <label>
+              <span>标题</span>
+              <input id="textTitle" value="往年题.txt" autocomplete="off" />
+            </label>
+            <label>
+              <span>文本类型</span>
+              <select id="textKind">
+                <option value="past_exam">往年题</option>
+                <option value="transcript">课堂文字稿</option>
+                <option value="notes">课件/笔记</option>
+              </select>
+            </label>
+            <textarea id="textInput" rows="5" placeholder="粘贴往年题、文字稿、字幕或笔记文本"></textarea>
+            <button type="submit">保存文本</button>
+          </form>
+
+          <form id="uploadForm" class="control-group">
+            <label>
+              <span>类型</span>
+              <select id="kindInput" name="kind">
+                <option value="past_exam">往年题</option>
+                <option value="lecture_video">课堂视频</option>
+                <option value="lecture_audio">课堂音频</option>
+                <option value="transcript">课堂文字稿</option>
+                <option value="notes">课件/笔记</option>
+              </select>
+            </label>
+            <label class="file-picker">
+              <span>文件</span>
+              <input id="fileInput" name="file" type="file" />
+            </label>
+            <button type="submit">上传文件</button>
+          </form>
+
+          <form id="remoteForm" class="control-group remote-group">
+            <label>
+              <span>视频标题</span>
+              <input id="remoteTitle" value="学在吉大视频" autocomplete="off" />
+            </label>
+            <label>
+              <span>视频地址</span>
+              <input id="remoteUrl" placeholder="手动粘贴 mp4 或 m3u8 地址" autocomplete="off" />
+            </label>
+            <label>
+              <span>来源页面</span>
+              <input id="remotePageUrl" placeholder="可选：视频页 URL" autocomplete="off" />
+            </label>
+            <button type="submit">手动导入</button>
+          </form>
+        </section>
+      </details>
     </main>
 
     <div id="toast" class="toast" hidden></div>

@@ -3,7 +3,7 @@
 }
 
 body {
-  width: 420px;
+  width: 380px;
   margin: 0;
   padding: 14px;
   font-family: "Microsoft YaHei", "Segoe UI", sans-serif;
@@ -12,6 +12,10 @@ body {
 }
 
 header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
   margin-bottom: 12px;
 }
 
@@ -24,23 +28,7 @@ p {
   margin: 5px 0 0;
   color: #667085;
   font-size: 12px;
-}
-
-label {
-  display: grid;
-  gap: 5px;
-  margin-bottom: 10px;
-  color: #667085;
-  font-size: 12px;
-}
-
-input {
-  width: 100%;
-  border: 1px solid #d9dee7;
-  border-radius: 8px;
-  padding: 8px 9px;
-  background: white;
-  color: #17202a;
+  line-height: 1.45;
 }
 
 button {
@@ -57,48 +45,76 @@ button:hover {
   border-color: #0f766e;
 }
 
-.actions {
-  display: flex;
-  gap: 8px;
-  margin: 10px 0;
+button:disabled {
+  cursor: wait;
+  opacity: 0.6;
 }
 
-#importAllBtn {
-  background: #0f766e;
-  border-color: #0f766e;
-  color: white;
-  flex: 1;
+.switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #17202a;
+  font-size: 12px;
 }
 
-.candidate-list {
+.switch input {
+  width: 16px;
+  height: 16px;
+}
+
+.panel {
   display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 8px;
-  max-height: 300px;
-  overflow: auto;
+  margin-bottom: 10px;
 }
 
-.candidate {
+.metric,
+.page {
   border: 1px solid #d9dee7;
   border-radius: 8px;
   padding: 9px;
   background: white;
 }
 
-.candidate-head {
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
-  font-size: 12px;
+.metric span,
+.page span {
+  display: block;
   color: #667085;
+  font-size: 11px;
 }
 
-.url {
-  margin-top: 5px;
-  color: #17202a;
-  font-size: 12px;
+.metric strong,
+.page strong {
+  display: block;
+  margin-top: 3px;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+.page {
+  margin-bottom: 10px;
+}
+
+.page p {
   word-break: break-all;
 }
 
+.actions {
+  display: flex;
+  gap: 8px;
+  margin: 10px 0;
+}
+
+#openDashboardBtn {
+  background: #0f766e;
+  border-color: #0f766e;
+  color: white;
+  flex: 1;
+}
+
 .hint {
-  line-height: 1.45;
+  padding-top: 8px;
+  border-top: 1px solid #d9dee7;
 }

@@ -2,11 +2,20 @@ const state = {
   materials: [],
   latest: null,
   refreshTimer: null,
+  statusTimer: null,
+  extensionPath: "D:\\QIMO_AGENT_TEST\\browser-extension\\qimo-catcher",
 };
 
 const el = {
   systemLine: document.querySelector("#systemLine"),
   refreshBtn: document.querySelector("#refreshBtn"),
+  serviceState: document.querySelector("#serviceState"),
+  serviceDetail: document.querySelector("#serviceDetail"),
+  extensionState: document.querySelector("#extensionState"),
+  extensionDetail: document.querySelector("#extensionDetail"),
+  captureState: document.querySelector("#captureState"),
+  captureDetail: document.querySelector("#captureDetail"),
+  activityLine: document.querySelector("#activityLine"),
   courseInput: document.querySelector("#courseInput"),
   uploadForm: document.querySelector("#uploadForm"),
   kindInput: document.querySelector("#kindInput"),
@@ -15,7 +24,6 @@ const el = {
   remoteTitle: document.querySelector("#remoteTitle"),
   remoteUrl: document.querySelector("#remoteUrl"),
   remotePageUrl: document.querySelector("#remotePageUrl"),
-  copyBookmarkletBtn: document.querySelector("#copyBookmarkletBtn"),
   copyExtensionPathBtn: document.querySelector("#copyExtensionPathBtn"),
   llmEnabled: document.querySelector("#llmEnabled"),
   llmBaseUrl: document.querySelector("#llmBaseUrl"),
@@ -93,11 +101,67 @@ function truncate(value, length = 72) {
   return value.length > length ? `${value.slice(0, length)}...` : value;
 }
 
-async function loadSystem() {
-  const system = await api("/api/system");
-  const ffmpeg = system.ffmpeg ? "ffmpeg 可用" : "ffmpeg 不可用";
-  const whisper = system.whisper_installed ? "Whisper 已安装" : "Whisper 未安装";
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+async function loadAgentStatus() {
+  const course = encodeURIComponent(el.courseInput.value.trim());
+  const status = await api(`/api/agent/status${course ? `?course=${course}` : ""}`);
+  state.extensionPath = status.service.extension_path || state.extensionPath;
+  renderAgentStatus(status);
+}
+
+function renderAgentStatus(status) {
+  const service = status.service || {};
+  const extension = status.extension || {};
+  const materials = status.materials || {};
+
+  const ffmpeg = service.ffmpeg ? "ffmpeg 可用" : "ffmpeg 不可用";
+  const whisper = service.whisper_installed ? "Whisper 已安装" : "Whisper 未安装";
   el.systemLine.textContent = `${ffmpeg} / ${whisper}`;
+  el.serviceState.textContent = service.ok ? "运行中" : "未连接";
+  el.serviceDetail.textContent = `${ffmpeg}，${whisper}`;
+
+  if (!extension.connected || !extension.last_seen) {
+    el.extensionState.textContent = "等待连接";
+    el.extensionDetail.textContent = "安装扩展后打开学在吉大页面";
+  } else if (!extension.auto_enabled) {
+    el.extensionState.textContent = "已暂停";
+    el.extensionDetail.textContent = "在扩展弹窗里打开 Auto";
+  } else {
+    el.extensionState.textContent = "自动模式已开启";
+    el.extensionDetail.textContent = extension.page_title
+      ? `最近页面：${truncate(extension.page_title, 34)}`
+      : "正在等待课程视频请求";
+  }
+
+  if (extension.last_error) {
+    el.captureState.textContent = "需要查看";
+    el.captureDetail.textContent = truncate(extension.last_error, 56);
+  } else if (materials.running) {
+    el.captureState.textContent = "处理中";
+    el.captureDetail.textContent = `${materials.running} 份资料正在下载或转写`;
+  } else if (materials.ready) {
+    el.captureState.textContent = "已有资料";
+    el.captureDetail.textContent = `${materials.ready} 份可分析资料，收到 ${extension.uploaded_count || 0} 个视频上传`;
+  } else {
+    el.captureState.textContent = "待播放视频";
+    el.captureDetail.textContent = "打开课程视频后会自动开始";
+  }
+
+  if (materials.latest) {
+    el.activityLine.textContent = `最近收到：${materials.latest.original_name}，状态 ${statusLabel(materials.latest.status)}。`;
+  } else if (extension.connected) {
+    el.activityLine.textContent = "扩展已连接。现在打开学在吉大课程视频并播放几秒。";
+  } else {
+    el.activityLine.textContent = "等待扩展连接。复制扩展目录，在 Chrome 扩展页加载后再登录学在吉大。";
+  }
 }
 
 async function loadMaterials() {
@@ -109,7 +173,8 @@ async function loadMaterials() {
 function renderMaterials() {
   el.materialCount.textContent = `${state.materials.length} 份`;
   if (!state.materials.length) {
-    el.materialsBody.innerHTML = `<tr><td colspan="5" class="empty-state">暂无资料</td></tr>`;
+    el.materialsBody.innerHTML = `<tr><td colspan="5" class="empty-state">还没有资料。打开学在吉大课程视频并播放几秒，扩展会自动送入这里。</td></tr>`;
+    syncAutoRefresh();
     return;
   }
   el.materialsBody.innerHTML = state.materials
@@ -129,13 +194,10 @@ function renderMaterials() {
   syncAutoRefresh();
 }
 
-function escapeHtml(value) {
-  return String(value)
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
+function currentCourse() {
+  const typed = el.courseInput.value.trim();
+  if (typed) return typed;
+  return state.materials[0]?.course || "未命名课程";
 }
 
 async function uploadFile(event) {
@@ -145,15 +207,15 @@ async function uploadFile(event) {
     return;
   }
   const form = new FormData();
-  form.append("course", el.courseInput.value.trim() || "未命名课程");
+  form.append("course", currentCourse());
   form.append("kind", el.kindInput.value);
   form.append("file", el.fileInput.files[0]);
   el.uploadForm.querySelector("button").disabled = true;
   try {
     await api("/api/materials", { method: "POST", body: form });
     el.fileInput.value = "";
-    toast("上传完成");
-    await loadMaterials();
+    toast("已上传，后台处理中");
+    await reloadAll();
   } catch (error) {
     toast(error.message);
   } finally {
@@ -169,7 +231,7 @@ async function saveText(event) {
     return;
   }
   const payload = {
-    course: el.courseInput.value.trim() || "未命名课程",
+    course: currentCourse(),
     kind: el.textKind.value,
     title: el.textTitle.value.trim() || "pasted-text.txt",
     text,
@@ -183,7 +245,7 @@ async function saveText(event) {
     });
     el.textInput.value = "";
     toast("文本已保存");
-    await loadMaterials();
+    await reloadAll();
   } catch (error) {
     toast(error.message);
   } finally {
@@ -199,7 +261,7 @@ async function importRemoteVideo(event) {
     return;
   }
   const payload = {
-    course: el.courseInput.value.trim() || "未命名课程",
+    course: currentCourse(),
     title: el.remoteTitle.value.trim() || "学在吉大视频",
     url,
     page_url: el.remotePageUrl.value.trim(),
@@ -215,7 +277,7 @@ async function importRemoteVideo(event) {
     });
     el.remoteUrl.value = "";
     toast("下载任务已创建");
-    await loadMaterials();
+    await reloadAll();
   } catch (error) {
     toast(error.message);
   } finally {
@@ -228,8 +290,8 @@ function syncAutoRefresh() {
   if (hasRunningTask && !state.refreshTimer) {
     state.refreshTimer = window.setInterval(async () => {
       try {
-        await loadMaterials();
-      } catch (error) {
+        await reloadAll(false);
+      } catch {
         window.clearInterval(state.refreshTimer);
         state.refreshTimer = null;
       }
@@ -243,7 +305,7 @@ function syncAutoRefresh() {
 
 async function deleteMaterial(id) {
   await api(`/api/materials/${id}`, { method: "DELETE" });
-  await loadMaterials();
+  await reloadAll();
   toast("已删除");
 }
 
@@ -252,7 +314,7 @@ async function analyze() {
   el.analyzeBtn.textContent = el.llmEnabled.checked ? "AI 分析中" : "分析中";
   try {
     const payload = {
-      course: el.courseInput.value.trim() || "未命名课程",
+      course: currentCourse(),
       llm: readLlmSettings(),
     };
     const result = await api("/api/analyze", {
@@ -293,7 +355,7 @@ function renderReport(result) {
 
   if (!analysis.topics.length) {
     el.topicList.className = "topic-list empty-state";
-    el.topicList.textContent = "暂无分析结果";
+    el.topicList.textContent = "暂时没有分析结果。通常需要课堂文字稿、字幕或往年题文本。";
     return;
   }
   el.topicList.className = "topic-list";
@@ -395,12 +457,6 @@ function syncLlmStatus() {
   el.llmStatus.textContent = missing.length ? `缺少 ${missing.join("、")}` : "LLM 已配置";
 }
 
-function buildBookmarklet() {
-  const endpoint = `${window.location.origin}/api/imports/from-page`;
-  const code = `javascript:(async()=>{const endpoint=${JSON.stringify(endpoint)};const abs=u=>{try{return new URL(u,location.href).href}catch{return''}};const add=(set,u)=>{u=abs(u||'');if(/^https?:/i.test(u))set.add(u)};const urls=new Set();document.querySelectorAll('video,source,track,a[href],link[href]').forEach(el=>{add(urls,el.currentSrc);add(urls,el.src);add(urls,el.href)});try{(performance.getEntriesByType('resource')||[]).forEach(r=>{const u=r.name||'';const t=(r.initiatorType||'').toLowerCase();const s=Number(r.transferSize||r.encodedBodySize||r.decodedBodySize||0);if(t==='video'||t==='media'||t==='fetch'||t==='xmlhttprequest'||/\\.((mp4|m3u8|m4s|ts|vtt|srt))(\\?|#|$)/i.test(u)||/(vod|video|media|stream|play|courseware|resource|download)/i.test(u)||s>500000)add(urls,u)})}catch{};try{[...document.scripts].forEach(s=>{const txt=s.textContent||'';for(const m of txt.matchAll(/https?:\\\\/\\\\/[^\\\\s'\"<>]+/g))if(/(mp4|m3u8|video|media|stream|play|vod)/i.test(m[0]))add(urls,m[0])})}catch{};const clean=[...urls].map(u=>u.replace(/&amp;/g,'&')).filter(u=>!/^blob:/i.test(u));const textNodes=[];const sel=(getSelection&&String(getSelection()).trim())||'';if(sel.length>80)textNodes.push(sel);const keys='字幕 转写 转文字 文稿 transcript subtitle captions 识别结果';document.querySelectorAll('textarea,[contenteditable=true],.transcript,.subtitle,.caption,.captions,[class*=transcript],[class*=subtitle],[class*=caption],[id*=transcript],[id*=subtitle],[id*=caption]').forEach(el=>{const txt=(el.value||el.innerText||el.textContent||'').trim();if(txt.length>80)textNodes.push(txt)});document.querySelectorAll('section,article,main,div').forEach(el=>{const txt=(el.innerText||'').trim();if(txt.length>180&&txt.length<30000&&/(字幕|转写|转文字|文稿|00:|0:|老师|重点|考试|transcript|subtitle|caption)/i.test(txt))textNodes.push(txt)});const transcript=[...new Set(textNodes)].sort((a,b)=>b.length-a.length)[0]||'';if(!clean.length&&!transcript){alert('没有检测到视频候选或页面文字稿。请先播放视频，或把浏览器扩展识别出的 mp4/m3u8 地址粘贴到本地页面。');return}const title=prompt('导入标题',document.title||'学在吉大视频');if(title===null)return;const course=prompt('课程名','未命名课程');if(course===null)return;try{const res=await fetch(endpoint,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({course,title,url:clean[0]||'',page_url:location.href,kind:'lecture_video',auto_analyze:true,detected_urls:clean,transcript_text:transcript.slice(0,200000),transcript_title:title+'-页面文字稿.txt'})});if(!res.ok)throw new Error(await res.text());alert('已提交：视频候选 '+clean.length+' 个，文字稿 '+transcript.length+' 字。回到本地页面查看进度。')}catch(err){alert('导入失败：'+err.message)}})()`;
-  state.bookmarkletCode = code;
-}
-
 async function copyText(text, fallbackTitle) {
   try {
     await navigator.clipboard.writeText(text);
@@ -410,22 +466,27 @@ async function copyText(text, fallbackTitle) {
   }
 }
 
-function copyBookmarklet() {
-  if (!state.bookmarkletCode) buildBookmarklet();
-  copyText(state.bookmarkletCode, "复制这段脚本，新建书签并粘贴到网址");
+function copyExtensionPath() {
+  copyText(state.extensionPath, "Chrome 扩展目录");
 }
 
-function copyExtensionPath() {
-  copyText("D:\\QIMO_AGENT_TEST\\browser-extension\\qimo-catcher", "Chrome 扩展目录");
+async function reloadAll(withLatest = true) {
+  await loadAgentStatus();
+  await loadMaterials();
+  if (withLatest) await loadLatest();
 }
 
 async function boot() {
   try {
     loadLlmSettings();
-    buildBookmarklet();
-    await loadSystem();
-    await loadMaterials();
-    await loadLatest();
+    await reloadAll();
+    state.statusTimer = window.setInterval(async () => {
+      try {
+        await loadAgentStatus();
+      } catch {
+        el.extensionState.textContent = "等待连接";
+      }
+    }, 5000);
   } catch (error) {
     toast(error.message);
   }
@@ -434,7 +495,6 @@ async function boot() {
 el.uploadForm.addEventListener("submit", uploadFile);
 el.remoteForm.addEventListener("submit", importRemoteVideo);
 el.textForm.addEventListener("submit", saveText);
-el.copyBookmarkletBtn.addEventListener("click", copyBookmarklet);
 el.copyExtensionPathBtn.addEventListener("click", copyExtensionPath);
 ["change", "input"].forEach((eventName) => {
   [el.llmEnabled, el.llmBaseUrl, el.llmApiKey, el.llmModel, el.llmTemperature].forEach((node) => {
@@ -443,11 +503,10 @@ el.copyExtensionPathBtn.addEventListener("click", copyExtensionPath);
 });
 el.analyzeBtn.addEventListener("click", analyze);
 el.refreshBtn.addEventListener("click", async () => {
-  await loadSystem();
-  await loadMaterials();
+  await reloadAll();
   toast("已刷新");
 });
-el.courseInput.addEventListener("change", loadMaterials);
+el.courseInput.addEventListener("change", reloadAll);
 el.materialsBody.addEventListener("click", async (event) => {
   const button = event.target.closest("[data-delete]");
   if (!button) return;
