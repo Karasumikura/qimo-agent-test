@@ -55,7 +55,8 @@ button,
 
 button[type="submit"],
 #analyzeBtn,
-.primary-link {
+.primary-link,
+.primary-action {
   border-color: var(--teal);
   background: var(--teal);
   color: white;
@@ -68,7 +69,8 @@ button:hover,
 
 button[type="submit"]:hover,
 #analyzeBtn:hover,
-.primary-link:hover {
+.primary-link:hover,
+.primary-action:hover {
   background: var(--teal-strong);
 }
 

@@ -13,7 +13,8 @@
         <p id="systemLine">正在连接本地服务</p>
       </div>
       <div class="header-actions">
-        <a class="primary-link" href="https://ilearntec.jlu.edu.cn/courselibrary-web/index" target="_blank" rel="noreferrer">打开学在吉大</a>
+        <button id="startBrowserBtn" class="primary-action" type="button">启动学在吉大浏览器</button>
+        <button id="scanBrowserBtn" type="button">立即扫描</button>
         <button id="refreshBtn" type="button">刷新</button>
       </div>
     </header>
@@ -21,25 +22,25 @@
     <main class="shell">
       <section class="autopilot">
         <div class="autopilot-copy">
-          <span class="eyebrow">自动模式</span>
-          <h2>登录学在吉大后，后面的收集和分析交给后台。</h2>
-          <p>先启动本地服务并安装浏览器扩展。之后你只需要在浏览器里正常登录学在吉大、打开课程视频并播放几秒，系统会自动抓取可访问的视频、页面已有文字稿和字幕线索。</p>
+          <span class="eyebrow">受控浏览器模式</span>
+          <h2>不用扩展。登录一次，后面的收集和分析交给后台。</h2>
+          <p>点击启动专用浏览器，在里面正常登录学在吉大。它会保存独立登录态，后台监听课程视频、字幕和页面已有文字稿，并自动导入分析。</p>
         </div>
         <div class="status-grid">
-          <article class="status-tile" id="serviceTile">
+          <article class="status-tile">
             <span>本地服务</span>
             <strong id="serviceState">运行中</strong>
             <p id="serviceDetail">检查 ffmpeg / Whisper</p>
           </article>
-          <article class="status-tile" id="extensionTile">
-            <span>浏览器扩展</span>
-            <strong id="extensionState">等待连接</strong>
-            <p id="extensionDetail">安装后会自动回传状态</p>
+          <article class="status-tile">
+            <span>专用浏览器</span>
+            <strong id="browserState">未启动</strong>
+            <p id="browserDetail">点击上方按钮打开</p>
           </article>
-          <article class="status-tile" id="captureTile">
+          <article class="status-tile">
             <span>自动收集</span>
             <strong id="captureState">待播放视频</strong>
-            <p id="captureDetail">打开课程视频后自动开始</p>
+            <p id="captureDetail">登录后打开课程视频并播放几秒</p>
           </article>
         </div>
       </section>
@@ -48,23 +49,22 @@
         <div class="step done">
           <span>1</span>
           <div>
-            <strong>本地服务已打开</strong>
-            <p>这个页面能访问，就说明后端已经在运行。</p>
+            <strong>启动专用浏览器</strong>
+            <p>系统会使用独立 profile，不读取你的日常 Chrome 数据。</p>
           </div>
         </div>
         <div class="step">
           <span>2</span>
           <div>
-            <strong>安装 Qimo Catcher 扩展</strong>
-            <p>在 Chrome 扩展页开启开发者模式，加载本项目扩展目录。</p>
-            <button id="copyExtensionPathBtn" type="button">复制扩展目录</button>
+            <strong>在专用浏览器里登录学在吉大</strong>
+            <p>登录、验证码都由你自己完成；本地服务不保存账号密码。</p>
           </div>
         </div>
         <div class="step">
           <span>3</span>
           <div>
-            <strong>登录并播放课程视频</strong>
-            <p>登录态由浏览器自己保存。本系统不读取账号、密码或 Cookie。</p>
+            <strong>打开课程视频并播放</strong>
+            <p>系统会自动抓取可访问媒体请求和页面文字稿。</p>
           </div>
         </div>
       </section>
@@ -84,7 +84,7 @@
               <button id="analyzeBtn" type="button">生成报告</button>
             </div>
           </div>
-          <div class="activity-line" id="activityLine">等待扩展自动送入课程资料。</div>
+          <div class="activity-line" id="activityLine">等待启动专用浏览器。</div>
           <div class="table-wrap">
             <table>
               <thead>

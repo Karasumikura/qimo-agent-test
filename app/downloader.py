@@ -87,31 +87,43 @@ def is_private_ip(ip: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
     )
 
 
-def download_remote_media(url: str, target_path: Path, page_url: str = "") -> list[str]:
+def download_remote_media(
+    url: str,
+    target_path: Path,
+    page_url: str = "",
+    extra_headers: dict[str, str] | None = None,
+) -> list[str]:
     parsed = validate_remote_media_url(url)
     suffix = Path(parsed.path).suffix.lower()
     notes = [f"来源页面：{page_url}" if page_url else "来源：手动视频地址"]
 
     target_path.parent.mkdir(parents=True, exist_ok=True)
     if suffix in HLS_EXTENSIONS:
-        notes.append(download_hls(url, target_path, page_url))
+        notes.append(download_hls(url, target_path, page_url, extra_headers))
     elif suffix in PARTIAL_MEDIA_EXTENSIONS:
         raise RemoteImportError("检测到分片地址，请在视频页导入完整 mp4 或 m3u8 播放列表。")
     else:
-        notes.append(download_file(url, target_path, page_url))
+        notes.append(download_file(url, target_path, page_url, extra_headers))
 
     reject_html_download(target_path)
     notes.append("已导入本地资料库。")
     return notes
 
 
-def download_file(url: str, target_path: Path, page_url: str = "") -> str:
+def download_file(
+    url: str,
+    target_path: Path,
+    page_url: str = "",
+    extra_headers: dict[str, str] | None = None,
+) -> str:
     headers = {"User-Agent": DEFAULT_USER_AGENT, "Accept": "*/*"}
     if page_url:
         headers["Referer"] = page_url
         origin = origin_from_url(page_url)
         if origin:
             headers["Origin"] = origin
+    if extra_headers:
+        headers.update({key: value for key, value in extra_headers.items() if value})
 
     request = urllib.request.Request(url, headers=headers)
     try:
@@ -141,7 +153,12 @@ def download_file(url: str, target_path: Path, page_url: str = "") -> str:
     return "已下载远程视频文件。"
 
 
-def download_hls(url: str, target_path: Path, page_url: str = "") -> str:
+def download_hls(
+    url: str,
+    target_path: Path,
+    page_url: str = "",
+    extra_headers: dict[str, str] | None = None,
+) -> str:
     if not has_ffmpeg():
         raise RemoteImportError("检测到 m3u8，但本机没有 ffmpeg，无法合并 HLS 视频。")
 
@@ -157,6 +174,9 @@ def download_hls(url: str, target_path: Path, page_url: str = "") -> str:
         origin = origin_from_url(page_url)
         if origin:
             header_lines.append(f"Origin: {origin}")
+    for key, value in (extra_headers or {}).items():
+        if value and key.lower() not in {"referer", "origin"}:
+            header_lines.append(f"{key}: {value}")
     if header_lines:
         command.extend(["-headers", "\r\n".join(header_lines) + "\r\n"])
     command.extend(["-i", url, "-c", "copy", str(target_path)])

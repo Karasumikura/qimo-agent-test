@@ -11,9 +11,10 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, PlainTextResponse, Response
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from .analyzer import analyze_materials, build_markdown_report
+from .controlled_browser import browser_agent
 from .downloader import RemoteImportError, download_remote_media, plan_import_path, validate_remote_media_url
 from .extractors import MEDIA_EXTENSIONS, extract_text_from_file, safe_filename
 from .jlu_connector import JluLearningConnector
@@ -99,6 +100,7 @@ class RemoteImportPayload(BaseModel):
     detected_urls: list[str] = []
     transcript_text: str = ""
     transcript_title: str = ""
+    request_headers: dict[str, str] = Field(default_factory=dict)
     llm: LlmSettings | None = None
 
 
@@ -114,6 +116,10 @@ class ExtensionHeartbeatPayload(BaseModel):
     last_error: str = ""
 
 
+class BrowserOpenPayload(BaseModel):
+    url: str = ""
+
+
 @app.middleware("http")
 async def add_private_network_cors_header(request: Request, call_next):
     response = await call_next(request)
@@ -125,6 +131,7 @@ async def add_private_network_cors_header(request: Request, call_next):
 @app.on_event("startup")
 def startup() -> None:
     init_storage()
+    browser_agent.configure_import_callback(import_from_browser_agent)
 
 
 @app.get("/")
@@ -143,6 +150,7 @@ def system_status() -> dict[str, Any]:
     return {
         "ffmpeg": has_ffmpeg(),
         "whisper_installed": whisper_available(),
+        "browser": browser_agent.snapshot(),
         "extension": current_extension_state(),
         "extension_path": str(ROOT_DIR / "browser-extension" / "qimo-catcher"),
         "public_entrypoints": [resource.__dict__ for resource in connector.list_public_entrypoints()],
@@ -164,6 +172,7 @@ def agent_status(course: str = "") -> dict[str, Any]:
             "whisper_installed": whisper_available(),
             "extension_path": str(ROOT_DIR / "browser-extension" / "qimo-catcher"),
         },
+        "browser": browser_agent.snapshot(),
         "extension": current_extension_state(),
         "materials": {
             "total": len(materials),
@@ -186,6 +195,66 @@ def extension_heartbeat(payload: ExtensionHeartbeatPayload) -> dict[str, Any]:
 
 def current_extension_state() -> dict[str, Any]:
     return dict(EXTENSION_STATE)
+
+
+@app.post("/api/browser/start")
+def start_browser(payload: BrowserOpenPayload | None = None) -> dict[str, Any]:
+    url = payload.url.strip() if payload and payload.url else ""
+    return browser_agent.start(url or "https://ilearntec.jlu.edu.cn/courselibrary-web/index")
+
+
+@app.post("/api/browser/stop")
+def stop_browser() -> dict[str, Any]:
+    return browser_agent.stop()
+
+
+@app.post("/api/browser/scan")
+def scan_browser() -> dict[str, Any]:
+    return browser_agent.scan_now()
+
+
+@app.post("/api/browser/open")
+def open_browser_url(payload: BrowserOpenPayload) -> dict[str, Any]:
+    if not payload.url.strip():
+        raise HTTPException(status_code=400, detail="url is required")
+    return browser_agent.open_url(payload.url.strip())
+
+
+def import_from_browser_agent(payload: dict[str, Any]) -> None:
+    data = RemoteImportPayload(**payload)
+    run_browser_import(data)
+
+
+def run_browser_import(payload: RemoteImportPayload) -> None:
+    init_storage()
+    candidates = clean_url_candidates(payload)
+    if not candidates and not payload.transcript_text.strip():
+        return
+
+    material_id = uuid.uuid4().hex
+    title = payload.title.strip() or "学在吉大视频"
+    if candidates:
+        planned_path = plan_import_path(UPLOAD_DIR, material_id, title, candidates[0])
+    else:
+        transcript_title = safe_filename(payload.transcript_title or title or "page-transcript")
+        if "." not in transcript_title:
+            transcript_title += ".txt"
+        planned_path = UPLOAD_DIR / f"{material_id}_{transcript_title}"
+    create_material(
+        {
+            "id": material_id,
+            "course": payload.course.strip() or DEFAULT_COURSE,
+            "kind": payload.kind,
+            "original_name": planned_path.name,
+            "stored_path": str(planned_path),
+            "status": "downloading",
+            "transcript": None,
+            "extracted_text": payload.transcript_text.strip() or None,
+            "audio_path": None,
+            "notes": "受控浏览器自动导入任务已创建。",
+        }
+    )
+    run_remote_import(material_id, payload, planned_path)
 
 
 @app.get("/api/materials")
@@ -353,7 +422,7 @@ def run_remote_import(material_id: str, payload: RemoteImportPayload, target_pat
 
         for candidate in candidates:
             try:
-                notes.extend(download_remote_media(candidate, target_path, payload.page_url))
+                notes.extend(download_remote_media(candidate, target_path, payload.page_url, payload.request_headers))
                 break
             except RemoteImportError as exc:
                 errors.append(f"{candidate}: {exc}")

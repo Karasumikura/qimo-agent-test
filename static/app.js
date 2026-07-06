@@ -3,16 +3,17 @@ const state = {
   latest: null,
   refreshTimer: null,
   statusTimer: null,
-  extensionPath: "D:\\QIMO_AGENT_TEST\\browser-extension\\qimo-catcher",
 };
 
 const el = {
   systemLine: document.querySelector("#systemLine"),
   refreshBtn: document.querySelector("#refreshBtn"),
+  startBrowserBtn: document.querySelector("#startBrowserBtn"),
+  scanBrowserBtn: document.querySelector("#scanBrowserBtn"),
   serviceState: document.querySelector("#serviceState"),
   serviceDetail: document.querySelector("#serviceDetail"),
-  extensionState: document.querySelector("#extensionState"),
-  extensionDetail: document.querySelector("#extensionDetail"),
+  browserState: document.querySelector("#browserState"),
+  browserDetail: document.querySelector("#browserDetail"),
   captureState: document.querySelector("#captureState"),
   captureDetail: document.querySelector("#captureDetail"),
   activityLine: document.querySelector("#activityLine"),
@@ -24,7 +25,6 @@ const el = {
   remoteTitle: document.querySelector("#remoteTitle"),
   remoteUrl: document.querySelector("#remoteUrl"),
   remotePageUrl: document.querySelector("#remotePageUrl"),
-  copyExtensionPathBtn: document.querySelector("#copyExtensionPathBtn"),
   llmEnabled: document.querySelector("#llmEnabled"),
   llmBaseUrl: document.querySelector("#llmBaseUrl"),
   llmApiKey: document.querySelector("#llmApiKey"),
@@ -68,9 +68,7 @@ async function api(path, options = {}) {
     throw new Error(detail);
   }
   const contentType = response.headers.get("content-type") || "";
-  if (contentType.includes("application/json")) {
-    return response.json();
-  }
+  if (contentType.includes("application/json")) return response.json();
   return response.text();
 }
 
@@ -113,13 +111,12 @@ function escapeHtml(value) {
 async function loadAgentStatus() {
   const course = encodeURIComponent(el.courseInput.value.trim());
   const status = await api(`/api/agent/status${course ? `?course=${course}` : ""}`);
-  state.extensionPath = status.service.extension_path || state.extensionPath;
   renderAgentStatus(status);
 }
 
 function renderAgentStatus(status) {
   const service = status.service || {};
-  const extension = status.extension || {};
+  const browser = status.browser || {};
   const materials = status.materials || {};
 
   const ffmpeg = service.ffmpeg ? "ffmpeg 可用" : "ffmpeg 不可用";
@@ -128,39 +125,72 @@ function renderAgentStatus(status) {
   el.serviceState.textContent = service.ok ? "运行中" : "未连接";
   el.serviceDetail.textContent = `${ffmpeg}，${whisper}`;
 
-  if (!extension.connected || !extension.last_seen) {
-    el.extensionState.textContent = "等待连接";
-    el.extensionDetail.textContent = "安装扩展后打开学在吉大页面";
-  } else if (!extension.auto_enabled) {
-    el.extensionState.textContent = "已暂停";
-    el.extensionDetail.textContent = "在扩展弹窗里打开 Auto";
+  if (!browser.running) {
+    el.browserState.textContent = "未启动";
+    el.browserDetail.textContent = "点击“启动学在吉大浏览器”";
+  } else if (browser.last_error) {
+    el.browserState.textContent = "需要查看";
+    el.browserDetail.textContent = truncate(browser.last_error, 56);
+  } else if (browser.logged_in_hint) {
+    el.browserState.textContent = "已进入学在吉大";
+    el.browserDetail.textContent = browser.page_title ? truncate(browser.page_title, 42) : "正在监听页面";
   } else {
-    el.extensionState.textContent = "自动模式已开启";
-    el.extensionDetail.textContent = extension.page_title
-      ? `最近页面：${truncate(extension.page_title, 34)}`
-      : "正在等待课程视频请求";
+    el.browserState.textContent = "等待登录";
+    el.browserDetail.textContent = "请在弹出的专用浏览器里完成认证";
   }
 
-  if (extension.last_error) {
-    el.captureState.textContent = "需要查看";
-    el.captureDetail.textContent = truncate(extension.last_error, 56);
-  } else if (materials.running) {
+  if (materials.running) {
     el.captureState.textContent = "处理中";
     el.captureDetail.textContent = `${materials.running} 份资料正在下载或转写`;
   } else if (materials.ready) {
     el.captureState.textContent = "已有资料";
-    el.captureDetail.textContent = `${materials.ready} 份可分析资料，收到 ${extension.uploaded_count || 0} 个视频上传`;
+    el.captureDetail.textContent = `${materials.ready} 份可分析资料，浏览器已捕获 ${browser.captured_count || 0} 个候选请求`;
+  } else if (browser.captured_count) {
+    el.captureState.textContent = "已捕获请求";
+    el.captureDetail.textContent = `已看到 ${browser.captured_count} 个候选请求，正在尝试导入`;
   } else {
     el.captureState.textContent = "待播放视频";
-    el.captureDetail.textContent = "打开课程视频后会自动开始";
+    el.captureDetail.textContent = browser.running ? "打开课程视频并播放几秒" : "先启动专用浏览器";
   }
 
   if (materials.latest) {
     el.activityLine.textContent = `最近收到：${materials.latest.original_name}，状态 ${statusLabel(materials.latest.status)}。`;
-  } else if (extension.connected) {
-    el.activityLine.textContent = "扩展已连接。现在打开学在吉大课程视频并播放几秒。";
+  } else if (browser.running) {
+    el.activityLine.textContent = browser.page_url
+      ? `专用浏览器正在监听：${truncate(browser.page_title || browser.page_url, 60)}`
+      : "专用浏览器已启动，请登录学在吉大。";
   } else {
-    el.activityLine.textContent = "等待扩展连接。复制扩展目录，在 Chrome 扩展页加载后再登录学在吉大。";
+    el.activityLine.textContent = "等待启动专用浏览器。";
+  }
+}
+
+async function startControlledBrowser() {
+  el.startBrowserBtn.disabled = true;
+  try {
+    await api("/api/browser/start", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    toast("已启动专用浏览器，请在新窗口登录学在吉大");
+    await reloadAll(false);
+  } catch (error) {
+    toast(error.message);
+  } finally {
+    el.startBrowserBtn.disabled = false;
+  }
+}
+
+async function scanControlledBrowser() {
+  el.scanBrowserBtn.disabled = true;
+  try {
+    await api("/api/browser/scan", { method: "POST" });
+    toast("已触发扫描");
+    await reloadAll(false);
+  } catch (error) {
+    toast(error.message);
+  } finally {
+    el.scanBrowserBtn.disabled = false;
   }
 }
 
@@ -173,7 +203,7 @@ async function loadMaterials() {
 function renderMaterials() {
   el.materialCount.textContent = `${state.materials.length} 份`;
   if (!state.materials.length) {
-    el.materialsBody.innerHTML = `<tr><td colspan="5" class="empty-state">还没有资料。打开学在吉大课程视频并播放几秒，扩展会自动送入这里。</td></tr>`;
+    el.materialsBody.innerHTML = `<tr><td colspan="5" class="empty-state">还没有资料。启动专用浏览器、登录学在吉大并播放课程视频后会自动出现在这里。</td></tr>`;
     syncAutoRefresh();
     return;
   }
@@ -457,19 +487,6 @@ function syncLlmStatus() {
   el.llmStatus.textContent = missing.length ? `缺少 ${missing.join("、")}` : "LLM 已配置";
 }
 
-async function copyText(text, fallbackTitle) {
-  try {
-    await navigator.clipboard.writeText(text);
-    toast("已复制");
-  } catch {
-    window.prompt(fallbackTitle, text);
-  }
-}
-
-function copyExtensionPath() {
-  copyText(state.extensionPath, "Chrome 扩展目录");
-}
-
 async function reloadAll(withLatest = true) {
   await loadAgentStatus();
   await loadMaterials();
@@ -484,7 +501,7 @@ async function boot() {
       try {
         await loadAgentStatus();
       } catch {
-        el.extensionState.textContent = "等待连接";
+        el.browserState.textContent = "等待连接";
       }
     }, 5000);
   } catch (error) {
@@ -492,10 +509,11 @@ async function boot() {
   }
 }
 
+el.startBrowserBtn.addEventListener("click", startControlledBrowser);
+el.scanBrowserBtn.addEventListener("click", scanControlledBrowser);
 el.uploadForm.addEventListener("submit", uploadFile);
 el.remoteForm.addEventListener("submit", importRemoteVideo);
 el.textForm.addEventListener("submit", saveText);
-el.copyExtensionPathBtn.addEventListener("click", copyExtensionPath);
 ["change", "input"].forEach((eventName) => {
   [el.llmEnabled, el.llmBaseUrl, el.llmApiKey, el.llmModel, el.llmTemperature].forEach((node) => {
     node.addEventListener(eventName, saveLlmSettings);
