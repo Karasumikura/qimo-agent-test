@@ -8,8 +8,8 @@ const state = {
 const el = {
   systemLine: document.querySelector("#systemLine"),
   refreshBtn: document.querySelector("#refreshBtn"),
-  startBrowserBtn: document.querySelector("#startBrowserBtn"),
-  scanBrowserBtn: document.querySelector("#scanBrowserBtn"),
+  startBrowserButtons: Array.from(document.querySelectorAll("[data-start-browser]")),
+  scanBrowserButtons: Array.from(document.querySelectorAll("[data-scan-browser]")),
   serviceState: document.querySelector("#serviceState"),
   serviceDetail: document.querySelector("#serviceDetail"),
   browserState: document.querySelector("#browserState"),
@@ -53,6 +53,12 @@ function toast(message) {
   toast.timer = window.setTimeout(() => {
     el.toast.hidden = true;
   }, 3200);
+}
+
+function setButtonsDisabled(buttons, disabled) {
+  buttons.forEach((button) => {
+    button.disabled = disabled;
+  });
 }
 
 async function api(path, options = {}) {
@@ -165,7 +171,7 @@ function renderAgentStatus(status) {
 }
 
 async function startControlledBrowser() {
-  el.startBrowserBtn.disabled = true;
+  setButtonsDisabled(el.startBrowserButtons, true);
   try {
     await api("/api/browser/start", {
       method: "POST",
@@ -177,12 +183,12 @@ async function startControlledBrowser() {
   } catch (error) {
     toast(error.message);
   } finally {
-    el.startBrowserBtn.disabled = false;
+    setButtonsDisabled(el.startBrowserButtons, false);
   }
 }
 
 async function scanControlledBrowser() {
-  el.scanBrowserBtn.disabled = true;
+  setButtonsDisabled(el.scanBrowserButtons, true);
   try {
     await api("/api/browser/scan", { method: "POST" });
     toast("已触发扫描");
@@ -190,7 +196,7 @@ async function scanControlledBrowser() {
   } catch (error) {
     toast(error.message);
   } finally {
-    el.scanBrowserBtn.disabled = false;
+    setButtonsDisabled(el.scanBrowserButtons, false);
   }
 }
 
@@ -509,8 +515,12 @@ async function boot() {
   }
 }
 
-el.startBrowserBtn.addEventListener("click", startControlledBrowser);
-el.scanBrowserBtn.addEventListener("click", scanControlledBrowser);
+el.startBrowserButtons.forEach((button) => {
+  button.addEventListener("click", startControlledBrowser);
+});
+el.scanBrowserButtons.forEach((button) => {
+  button.addEventListener("click", scanControlledBrowser);
+});
 el.uploadForm.addEventListener("submit", uploadFile);
 el.remoteForm.addEventListener("submit", importRemoteVideo);
 el.textForm.addEventListener("submit", saveText);
