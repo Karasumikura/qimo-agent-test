@@ -1,24 +1,21 @@
 # Qimo Catcher
 
-这是期末重点智能体的本地 Chrome 扩展，用来从浏览器网络层捕获课程视频请求，再提交给本地服务。
+Local Chrome extension for Qimo Review Agent.
 
-## 安装
+## Install
 
-1. 打开 Chrome：`chrome://extensions/`
-2. 打开“开发者模式”。
-3. 选择“加载已解压的扩展程序”。
-4. 选择目录：`D:\QIMO_AGENT_TEST\browser-extension\qimo-catcher`
+1. Open `chrome://extensions/`.
+2. Enable Developer mode.
+3. Click "Load unpacked".
+4. Select `D:\QIMO_AGENT_TEST\browser-extension\qimo-catcher`.
 
-## 使用
+## Use
 
-1. 先启动本地服务：`http://127.0.0.1:8000`
-2. 在浏览器中登录学在吉大。
-3. 打开课程视频并播放几秒。
-4. 点击 Qimo Catcher 扩展图标。
-5. 确认候选 URL，点击“导入全部候选”。
+1. Start the local service at `http://127.0.0.1:8000`.
+2. Log in to the course site in Chrome.
+3. Open the course video and play it for a few seconds.
+4. Click the Qimo Catcher extension icon.
+5. Click "Upload first in browser" first. This downloads with the logged-in browser session and uploads the file to the local service.
+6. If browser upload fails, click "Import URLs" as fallback.
 
-扩展会优先捕获 `video/mp4`、`m3u8`、`media`、`xhr/fetch` 中疑似视频流的请求。它也会尝试读取页面已有的字幕、转写、文稿文本。
-
-## 边界
-
-扩展只把当前页面捕获到的视频候选 URL 和页面文字稿提交给本地 `127.0.0.1:8000` 服务。它不会把内容发送到第三方服务器。
+The extension sends data only to `127.0.0.1:8000`.
